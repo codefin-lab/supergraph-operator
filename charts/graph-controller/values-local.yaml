@@ -1,0 +1,12 @@
+# Local environment overrides
+controller:
+  image:
+    repository: vahalla/graph-controller
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+config:
+  routerDeployment: "graph-router"
+  supergraphConfigMap: "graph-supergraph"
+
+namespace: vahalla-local

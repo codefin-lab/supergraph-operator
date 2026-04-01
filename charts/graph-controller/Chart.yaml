@@ -1,0 +1,6 @@
+apiVersion: v2
+name: graph-controller
+description: Kubernetes controller for auto-composing Apollo Federation supergraph from SubgraphSchema CRDs
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,23 @@
+# Graph Controller Configuration
+controller:
+  image:
+    repository: vahalla/graph-controller
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "250m"
+
+# Controller flags
+config:
+  federationVersion: "=2.7.0"
+  routerDeployment: "graph-router"
+  supergraphConfigMap: "graph-supergraph"
+
+# Namespace
+namespace: vahalla

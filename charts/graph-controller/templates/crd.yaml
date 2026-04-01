@@ -1,0 +1,82 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: subgraphschemas.vahalla.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.16.0
+spec:
+  group: vahalla.io
+  names:
+    kind: SubgraphSchema
+    listKind: SubgraphSchemaList
+    plural: subgraphschemas
+    singular: subgraphschema
+    shortNames:
+      - sgs
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: URL
+          type: string
+          jsonPath: .spec.routingUrl
+        - name: Status
+          type: string
+          jsonPath: .status.compositionStatus
+        - name: Last Composed
+          type: date
+          jsonPath: .status.lastComposed
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          description: SubgraphSchema declares a federation subgraph and its GraphQL schema.
+          type: object
+          required:
+            - spec
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: SubgraphSchemaSpec defines the desired state of a federation subgraph.
+              type: object
+              required:
+                - routingUrl
+                - schema
+              properties:
+                routingUrl:
+                  description: URL where the subgraph can be reached by the router.
+                  type: string
+                schema:
+                  description: Full GraphQL SDL for this subgraph.
+                  type: string
+            status:
+              description: SubgraphSchemaStatus defines the observed state after composition.
+              type: object
+              properties:
+                compositionStatus:
+                  description: Whether the last composition succeeded.
+                  type: string
+                  enum:
+                    - Success
+                    - Failed
+                    - Pending
+                lastComposed:
+                  description: Timestamp of the last successful composition.
+                  type: string
+                  format: date-time
+                supergraphChecksum:
+                  description: SHA-256 of the last composed supergraph.
+                  type: string
+                message:
+                  description: Human-readable details about the composition result.
+                  type: string

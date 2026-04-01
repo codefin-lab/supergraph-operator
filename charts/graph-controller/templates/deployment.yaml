@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "graph-controller.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "graph-controller.controller.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.controller.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graph-controller
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      labels:
+        {{- include "graph-controller.controller.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "graph-controller.fullname" . }}
+      containers:
+        - name: controller
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          args:
+            - "--namespace={{ .Values.namespace }}"
+            - "--federation-version={{ .Values.config.federationVersion }}"
+            - "--router-deployment={{ .Values.config.routerDeployment }}"
+            - "--supergraph-configmap={{ .Values.config.supergraphConfigMap }}"
+            - "--health-probe-bind-address=:8081"
+            - "--metrics-bind-address=:8080"
+          ports:
+            - name: metrics
+              containerPort: 8080
+              protocol: TCP
+            - name: health
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: health
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.controller.resources | nindent 12 }}
