@@ -13,7 +13,7 @@ Kubernetes controller that automatically composes an Apollo Federation supergrap
 ## CRD: SubgraphSchema
 
 ```yaml
-apiVersion: vahalla.io/v1alpha1
+apiVersion: vahalla.app/v1alpha1
 kind: SubgraphSchema
 metadata:
   name: crm-service

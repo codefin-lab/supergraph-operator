@@ -98,10 +98,10 @@ cat "$CONFIG" >> "$OUTPUT"
 
 	s := newScheme()
 	reconciler := &SubgraphSchemaReconciler{
-		Client:             fake.NewClientBuilder().WithScheme(s).Build(),
-		Scheme:             s,
-		FederationVersion:  "=2.7.0",
-		RoverPath:          mockRover,
+		Client:            fake.NewClientBuilder().WithScheme(s).Build(),
+		Scheme:            s,
+		FederationVersion: "=2.7.0",
+		RoverPath:         mockRover,
 	}
 
 	schemas := []vahallav1alpha1.SubgraphSchema{
@@ -162,8 +162,8 @@ func TestUpsertConfigMapCreates(t *testing.T) {
 	if cm.Data["supergraph.graphql"] != sdl {
 		t.Errorf("expected ConfigMap data to contain SDL, got: %s", cm.Data["supergraph.graphql"])
 	}
-	if cm.Annotations["vahalla.io/supergraph-checksum"] != checksum {
-		t.Errorf("expected checksum annotation %s, got: %s", checksum, cm.Annotations["vahalla.io/supergraph-checksum"])
+	if cm.Annotations["vahalla.app/supergraph-checksum"] != checksum {
+		t.Errorf("expected checksum annotation %s, got: %s", checksum, cm.Annotations["vahalla.app/supergraph-checksum"])
 	}
 }
 
@@ -175,7 +175,7 @@ func TestUpsertConfigMapUpdates(t *testing.T) {
 			Name:      "graph-supergraph",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"vahalla.io/supergraph-checksum": "old-checksum",
+				"vahalla.app/supergraph-checksum": "old-checksum",
 			},
 		},
 		Data: map[string]string{
@@ -206,8 +206,8 @@ func TestUpsertConfigMapUpdates(t *testing.T) {
 	if cm.Data["supergraph.graphql"] != newSDL {
 		t.Errorf("expected updated SDL, got: %s", cm.Data["supergraph.graphql"])
 	}
-	if cm.Annotations["vahalla.io/supergraph-checksum"] != newChecksum {
-		t.Errorf("expected new checksum, got: %s", cm.Annotations["vahalla.io/supergraph-checksum"])
+	if cm.Annotations["vahalla.app/supergraph-checksum"] != newChecksum {
+		t.Errorf("expected new checksum, got: %s", cm.Annotations["vahalla.app/supergraph-checksum"])
 	}
 }
 
@@ -236,7 +236,7 @@ func TestPatchDeploymentUpdatesAnnotation(t *testing.T) {
 		t.Fatalf("failed to get deployment: %v", err)
 	}
 
-	got := updated.Spec.Template.Annotations["vahalla.io/supergraph-checksum"]
+	got := updated.Spec.Template.Annotations["vahalla.app/supergraph-checksum"]
 	if got != checksum {
 		t.Errorf("expected annotation %s, got: %s", checksum, got)
 	}
@@ -248,7 +248,7 @@ func TestPatchDeploymentSkipsWhenSameChecksum(t *testing.T) {
 	s := newScheme()
 	deploy := newRouterDeployment("default")
 	deploy.Spec.Template.Annotations = map[string]string{
-		"vahalla.io/supergraph-checksum": "same-checksum",
+		"vahalla.app/supergraph-checksum": "same-checksum",
 	}
 	cl := fake.NewClientBuilder().WithScheme(s).WithObjects(deploy).Build()
 
@@ -345,7 +345,7 @@ echo "# mock supergraph" > "$OUTPUT"
 	if err := cl.Get(ctx, types.NamespacedName{Name: "graph-router", Namespace: "default"}, &updatedDeploy); err != nil {
 		t.Fatalf("failed to get deployment: %v", err)
 	}
-	if updatedDeploy.Spec.Template.Annotations["vahalla.io/supergraph-checksum"] == "" {
+	if updatedDeploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"] == "" {
 		t.Error("expected checksum annotation on deployment")
 	}
 

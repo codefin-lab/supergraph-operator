@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,14 +29,14 @@ type SubgraphSchemaReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	FederationVersion  string
-	RouterDeployment   string
+	FederationVersion   string
+	RouterDeployment    string
 	SupergraphConfigMap string
-	RoverPath          string
+	RoverPath           string
 }
 
-// +kubebuilder:rbac:groups=vahalla.io,resources=subgraphschemas,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=vahalla.io,resources=subgraphschemas/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=vahalla.app,resources=subgraphschemas,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=vahalla.app,resources=subgraphschemas/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch
 
@@ -178,7 +178,7 @@ func (r *SubgraphSchemaReconciler) upsertConfigMap(ctx context.Context, namespac
 					"app.kubernetes.io/part-of":    "vahalla",
 				},
 				Annotations: map[string]string{
-					"vahalla.io/supergraph-checksum": checksum,
+					"vahalla.app/supergraph-checksum": checksum,
 				},
 			},
 			Data: map[string]string{
@@ -192,7 +192,7 @@ func (r *SubgraphSchemaReconciler) upsertConfigMap(ctx context.Context, namespac
 	if cm.Annotations == nil {
 		cm.Annotations = map[string]string{}
 	}
-	cm.Annotations["vahalla.io/supergraph-checksum"] = checksum
+	cm.Annotations["vahalla.app/supergraph-checksum"] = checksum
 	if cm.Data == nil {
 		cm.Data = map[string]string{}
 	}
@@ -220,7 +220,7 @@ func (r *SubgraphSchemaReconciler) patchDeployment(ctx context.Context, namespac
 	// Only patch if the checksum actually changed.
 	currentChecksum := ""
 	if deploy.Spec.Template.Annotations != nil {
-		currentChecksum = deploy.Spec.Template.Annotations["vahalla.io/supergraph-checksum"]
+		currentChecksum = deploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"]
 	}
 	if currentChecksum == checksum {
 		return nil
@@ -230,7 +230,7 @@ func (r *SubgraphSchemaReconciler) patchDeployment(ctx context.Context, namespac
 	if deploy.Spec.Template.Annotations == nil {
 		deploy.Spec.Template.Annotations = map[string]string{}
 	}
-	deploy.Spec.Template.Annotations["vahalla.io/supergraph-checksum"] = checksum
+	deploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"] = checksum
 	return r.Patch(ctx, &deploy, patch)
 }
 
