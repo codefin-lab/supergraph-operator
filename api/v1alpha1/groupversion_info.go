@@ -1,3 +1,6 @@
+// +kubebuilder:object:generate=true
+// +groupName=vahalla.io
+
 package v1alpha1
 
 import (
