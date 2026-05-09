@@ -35,6 +35,8 @@ spec:
           env:
             - name: APOLLO_CONFIG_HOME
               value: /rover-home
+            - name: HOME
+              value: /rover-home
           command: ["/usr/bin/tini", "--", "supergraph-operator"]
           args:
             - "--namespace={{ .Values.namespace }}"
