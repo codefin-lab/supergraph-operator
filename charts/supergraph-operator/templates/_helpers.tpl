@@ -1,14 +1,14 @@
 {{/*
 Chart name
 */}}
-{{- define "graph-controller.name" -}}
+{{- define "supergraph-operator.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Fullname
 */}}
-{{- define "graph-controller.fullname" -}}
+{{- define "supergraph-operator.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,8 +24,8 @@ Fullname
 {{/*
 Common labels
 */}}
-{{- define "graph-controller.labels" -}}
-app.kubernetes.io/part-of: vahalla
+{{- define "supergraph-operator.labels" -}}
+app.kubernetes.io/part-of: supergraph-operator
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{- end }}
@@ -33,8 +33,8 @@ helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
 {{/*
 Controller labels
 */}}
-{{- define "graph-controller.controller.labels" -}}
-{{ include "graph-controller.labels" . }}
-app.kubernetes.io/name: graph-controller
+{{- define "supergraph-operator.controller.labels" -}}
+{{ include "supergraph-operator.labels" . }}
+app.kubernetes.io/name: supergraph-operator
 app.kubernetes.io/component: controller
 {{- end }}

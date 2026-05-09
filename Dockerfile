@@ -8,7 +8,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /graph-controller ./cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /supergraph-operator ./cmd/main.go
 
 # Rover stage — download rover CLI
 FROM ghcr.io/apollographql/rover:latest AS rover
@@ -19,9 +19,9 @@ FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tini curl
 
 COPY --from=rover /usr/local/bin/rover /usr/local/bin/rover
-COPY --from=builder /graph-controller /usr/local/bin/graph-controller
+COPY --from=builder /supergraph-operator /usr/local/bin/supergraph-operator
 
 USER 65532:65532
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["graph-controller"]
+CMD ["supergraph-operator"]

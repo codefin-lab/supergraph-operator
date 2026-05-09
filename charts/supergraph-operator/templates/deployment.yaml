@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "graph-controller.fullname" . }}
+  name: {{ include "supergraph-operator.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "graph-controller.controller.labels" . | nindent 4 }}
+    {{- include "supergraph-operator.controller.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controller.replicas }}
   selector:
     matchLabels:
-      app.kubernetes.io/name: graph-controller
+      app.kubernetes.io/name: supergraph-operator
       app.kubernetes.io/component: controller
   template:
     metadata:
       labels:
-        {{- include "graph-controller.controller.labels" . | nindent 8 }}
+        {{- include "supergraph-operator.controller.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "graph-controller.fullname" . }}
+      serviceAccountName: {{ include "supergraph-operator.fullname" . }}
       containers:
         - name: controller
           image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
@@ -26,8 +26,16 @@ spec:
             - "--federation-version={{ .Values.config.federationVersion }}"
             - "--router-deployment={{ .Values.config.routerDeployment }}"
             - "--supergraph-configmap={{ .Values.config.supergraphConfigMap }}"
+            - "--composition-timeout={{ .Values.config.compositionTimeout }}"
+            - "--history-count={{ .Values.config.historyCount }}"
             - "--health-probe-bind-address=:8081"
             - "--metrics-bind-address=:8080"
+            {{- if .Values.config.leaderElect }}
+            - "--leader-elect"
+            {{- end }}
+            {{- if .Values.config.dryRun }}
+            - "--dry-run"
+            {{- end }}
           ports:
             - name: metrics
               containerPort: 8080

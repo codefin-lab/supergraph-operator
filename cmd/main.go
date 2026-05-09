@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"time"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -11,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	codefiniov1alpha1 "github.com/codefin/supergraph-operator/api/v1alpha1"
 	"github.com/codefin/supergraph-operator/internal/controller"
@@ -31,6 +33,10 @@ func main() {
 	var routerDeployment string
 	var supergraphConfigMap string
 	var roverPath string
+	var leaderElect bool
+	var compositionTimeout time.Duration
+	var dryRun bool
+	var historyCount int
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -39,6 +45,10 @@ func main() {
 	flag.StringVar(&routerDeployment, "router-deployment", "graph-router", "Name of the router Deployment to patch on composition.")
 	flag.StringVar(&supergraphConfigMap, "supergraph-configmap", "graph-supergraph", "Name of the ConfigMap to store the composed supergraph.")
 	flag.StringVar(&roverPath, "rover-path", "rover", "Path to the rover CLI binary.")
+	flag.BoolVar(&leaderElect, "leader-elect", false, "Enable leader election for HA deployments.")
+	flag.DurationVar(&compositionTimeout, "composition-timeout", 2*time.Minute, "Timeout for rover compose execution.")
+	flag.BoolVar(&dryRun, "dry-run", false, "Compose but don't update ConfigMap or Deployment.")
+	flag.IntVar(&historyCount, "history-count", 0, "Number of previous supergraph versions to keep in ConfigMap (0=disabled).")
 
 	opts := zap.Options{Development: true}
 	opts.BindFlags(flag.CommandLine)
@@ -50,6 +60,12 @@ func main() {
 	mgrOpts := ctrl.Options{
 		Scheme:                 scheme,
 		HealthProbeBindAddress: probeAddr,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		LeaderElection:          leaderElect,
+		LeaderElectionID:        "supergraph-operator-leader",
+		LeaderElectionNamespace: namespace,
 	}
 
 	if namespace != "" {
@@ -67,10 +83,14 @@ func main() {
 	reconciler := &controller.SubgraphSchemaReconciler{
 		Client:              mgr.GetClient(),
 		Scheme:              mgr.GetScheme(),
+		Recorder:            mgr.GetEventRecorderFor("supergraph-operator"),
 		FederationVersion:   federationVersion,
 		RouterDeployment:    routerDeployment,
 		SupergraphConfigMap: supergraphConfigMap,
 		RoverPath:           roverPath,
+		CompositionTimeout:  compositionTimeout,
+		DryRun:              dryRun,
+		HistoryCount:        historyCount,
 	}
 
 	if err := reconciler.SetupWithManager(mgr); err != nil {
@@ -87,7 +107,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	logger.Info("starting manager")
+	logger.Info("starting manager", "leaderElect", leaderElect, "dryRun", dryRun, "historyCount", historyCount)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		logger.Error(err, "problem running manager")
 		os.Exit(1)

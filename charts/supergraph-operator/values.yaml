@@ -1,4 +1,4 @@
-# Graph Controller Configuration
+# Supergraph Operator Configuration
 controller:
   image:
     repository: ghcr.io/codefin/supergraph-operator
@@ -18,6 +18,10 @@ config:
   federationVersion: "=2.7.0"
   routerDeployment: "graph-router"
   supergraphConfigMap: "graph-supergraph"
+  compositionTimeout: "2m"
+  leaderElect: false
+  dryRun: false
+  historyCount: 0
 
 # Namespace
 namespace: vahalla

@@ -1,0 +1,16 @@
+apiVersion: codefin.io/v1alpha1
+kind: SubgraphSchema
+metadata:
+  name: products-service
+spec:
+  routingUrl: "http://products-service:8080/query"
+  schema: |
+    type Query {
+      products: [Product!]!
+      product(id: ID!): Product
+    }
+    type Product @key(fields: "id") {
+      id: ID!
+      name: String!
+      price: Float!
+    }

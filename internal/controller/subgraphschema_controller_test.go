@@ -149,7 +149,7 @@ func TestUpsertConfigMapCreates(t *testing.T) {
 	sdl := "type Query { hello: String! }"
 	checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(sdl)))
 
-	if err := reconciler.upsertConfigMap(ctx, "default", sdl, checksum); err != nil {
+	if err := reconciler.upsertConfigMap(ctx, "default", sdl, checksum, "schemas-hash-1"); err != nil {
 		t.Fatalf("upsertConfigMap create failed: %v", err)
 	}
 
@@ -194,7 +194,7 @@ func TestUpsertConfigMapUpdates(t *testing.T) {
 	newSDL := "type Query { updated: Boolean! }"
 	newChecksum := fmt.Sprintf("%x", sha256.Sum256([]byte(newSDL)))
 
-	if err := reconciler.upsertConfigMap(ctx, "default", newSDL, newChecksum); err != nil {
+	if err := reconciler.upsertConfigMap(ctx, "default", newSDL, newChecksum, "schemas-hash-2"); err != nil {
 		t.Fatalf("upsertConfigMap update failed: %v", err)
 	}
 

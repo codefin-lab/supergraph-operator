@@ -1,0 +1,18 @@
+# Example: embed SubgraphSchema in a service Helm chart.
+# Place this in your service's templates/ directory.
+#
+# Prerequisites:
+#   - File `schema.graphqls` at the root of your Helm chart
+#   - supergraph-operator CRD installed in the cluster
+
+apiVersion: codefin.io/v1alpha1
+kind: SubgraphSchema
+metadata:
+  name: {{ include "my-service.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "my-service.labels" . | nindent 4 }}
+spec:
+  routingUrl: "http://{{ include "my-service.fullname" . }}:{{ .Values.service.port }}/query"
+  schema: |
+    {{- .Files.Get "schema.graphqls" | nindent 4 }}

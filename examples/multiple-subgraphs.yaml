@@ -1,0 +1,36 @@
+apiVersion: codefin.io/v1alpha1
+kind: SubgraphSchema
+metadata:
+  name: users-service
+spec:
+  routingUrl: "http://users-service:8080/query"
+  schema: |
+    type Query {
+      me: User
+      users: [User!]!
+    }
+    type User @key(fields: "id") {
+      id: ID!
+      name: String!
+      email: String!
+    }
+---
+apiVersion: codefin.io/v1alpha1
+kind: SubgraphSchema
+metadata:
+  name: orders-service
+spec:
+  routingUrl: "http://orders-service:8080/query"
+  schema: |
+    type Query {
+      orders: [Order!]!
+      order(id: ID!): Order
+    }
+    type Order @key(fields: "id") {
+      id: ID!
+      total: Float!
+      customer: User!
+    }
+    type User @key(fields: "id") {
+      id: ID!
+    }
