@@ -34,7 +34,7 @@ spec:
                 - ALL
           env:
             - name: APOLLO_CONFIG_HOME
-              value: /tmp
+              value: /rover-home
           command: ["/usr/bin/tini", "--", "supergraph-operator"]
           args:
             - "--namespace={{ .Values.namespace }}"
@@ -73,8 +73,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: rover-home
+              mountPath: /rover-home
           resources:
             {{- toYaml .Values.controller.resources | nindent 12 }}
       volumes:
         - name: tmp
+          emptyDir: {}
+        - name: rover-home
           emptyDir: {}
