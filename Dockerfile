@@ -10,14 +10,20 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /supergraph-operator ./cmd/main.go
 
-# Rover stage — download rover CLI via official installer
+# Rover stage — download pre-built binary from GitHub Releases (supports amd64 + arm64)
 FROM alpine:3.20 AS rover-installer
 
 ARG ROVER_VERSION=0.27.3
+ARG TARGETARCH
 
-RUN apk add --no-cache curl && \
-    curl -sSL https://rover.apollo.dev/nix/${ROVER_VERSION} | sh && \
-    mv /root/.rover/bin/rover /usr/local/bin/rover
+RUN apk add --no-cache curl tar && \
+    case "${TARGETARCH}" in \
+      amd64) ARCH="x86_64-unknown-linux-musl" ;; \
+      arm64) ARCH="aarch64-unknown-linux-musl" ;; \
+      *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+    esac && \
+    curl -sSL "https://github.com/apollographql/rover/releases/download/v${ROVER_VERSION}/rover-v${ROVER_VERSION}-${ARCH}.tar.gz" \
+      | tar -xz -C /usr/local/bin rover
 
 # Runtime stage
 FROM alpine:3.20
