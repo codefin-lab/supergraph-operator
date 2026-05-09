@@ -32,6 +32,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+          env:
+            - name: APOLLO_CONFIG_HOME
+              value: /tmp
           command: ["/usr/bin/tini", "--", "supergraph-operator"]
           args:
             - "--namespace={{ .Values.namespace }}"
