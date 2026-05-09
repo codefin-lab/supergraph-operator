@@ -23,5 +23,11 @@ config:
   dryRun: false
   historyCount: 0
 
+# Prometheus metrics
+metrics:
+  serviceMonitor:
+    enabled: false
+    interval: "30s"
+
 # Namespace
 namespace: vahalla

@@ -429,6 +429,216 @@ func TestReconcileCompositionFailure(t *testing.T) {
 	}
 }
 
+// TestComputeSchemasChecksum verifies deterministic checksum regardless of input order.
+func TestComputeSchemasChecksum(t *testing.T) {
+	r := &SubgraphSchemaReconciler{}
+
+	a := *newSubgraphSchema("aaa", "default", "http://aaa:8080/query", "type Query { a: String! }")
+	b := *newSubgraphSchema("bbb", "default", "http://bbb:8080/query", "type Query { b: String! }")
+
+	hash1 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{a, b})
+	hash2 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{b, a})
+
+	if hash1 != hash2 {
+		t.Errorf("expected same checksum regardless of order, got %s vs %s", hash1, hash2)
+	}
+
+	// Changing schema content should change checksum.
+	c := *newSubgraphSchema("aaa", "default", "http://aaa:8080/query", "type Query { changed: Boolean! }")
+	hash3 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{c, b})
+	if hash1 == hash3 {
+		t.Error("expected different checksum when schema content changes")
+	}
+}
+
+// TestSchemasUnchanged verifies the diff detection against ConfigMap annotation.
+func TestSchemasUnchanged(t *testing.T) {
+	s := newScheme()
+	r := &SubgraphSchemaReconciler{
+		Scheme:              s,
+		SupergraphConfigMap: "graph-supergraph",
+	}
+
+	ctx := context.Background()
+
+	// No ConfigMap exists → should return false (need to compose).
+	cl := fake.NewClientBuilder().WithScheme(s).Build()
+	r.Client = cl
+	if r.schemasUnchanged(ctx, "default", "hash-1") {
+		t.Error("expected false when ConfigMap doesn't exist")
+	}
+
+	// ConfigMap exists with matching annotation → should return true.
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "graph-supergraph",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"codefin.io/schemas-checksum": "hash-1",
+			},
+		},
+	}
+	cl = fake.NewClientBuilder().WithScheme(s).WithObjects(cm).Build()
+	r.Client = cl
+	if !r.schemasUnchanged(ctx, "default", "hash-1") {
+		t.Error("expected true when checksum matches")
+	}
+
+	// Different checksum → should return false.
+	if r.schemasUnchanged(ctx, "default", "hash-2") {
+		t.Error("expected false when checksum differs")
+	}
+}
+
+// TestDryRunSkipsUpdate verifies dry-run mode doesn't create ConfigMap or patch Deployment.
+func TestDryRunSkipsUpdate(t *testing.T) {
+	tmpDir := t.TempDir()
+	mockRover := filepath.Join(tmpDir, "mock-rover")
+	mockScript := `#!/bin/sh
+OUTPUT=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output) OUTPUT="$2"; shift 2;;
+    *) shift;;
+  esac
+done
+echo "# mock supergraph" > "$OUTPUT"
+`
+	if err := os.WriteFile(mockRover, []byte(mockScript), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newScheme()
+	subgraph := newSubgraphSchema("svc", "default", "http://svc:8080/query", "type Query { ok: Boolean! }")
+
+	cl := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(subgraph).
+		WithStatusSubresource(subgraph).
+		Build()
+
+	reconciler := &SubgraphSchemaReconciler{
+		Client:              cl,
+		Scheme:              s,
+		FederationVersion:   "=2.7.0",
+		SupergraphConfigMap: "graph-supergraph",
+		RouterDeployment:    "graph-router",
+		RoverPath:           mockRover,
+		DryRun:              true,
+	}
+
+	ctx := context.Background()
+	result, err := reconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: "svc", Namespace: "default"},
+	})
+	if err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+	if result.RequeueAfter != 0 {
+		t.Errorf("expected no requeue, got: %v", result.RequeueAfter)
+	}
+
+	// ConfigMap should NOT have been created in dry-run mode.
+	var cm corev1.ConfigMap
+	if err := cl.Get(ctx, types.NamespacedName{Name: "graph-supergraph", Namespace: "default"}, &cm); err == nil {
+		t.Error("expected ConfigMap to NOT be created in dry-run mode")
+	}
+}
+
+// TestRotateHistory verifies history rotation in ConfigMap data.
+func TestRotateHistory(t *testing.T) {
+	r := &SubgraphSchemaReconciler{HistoryCount: 2}
+
+	cm := &corev1.ConfigMap{
+		Data: map[string]string{
+			"supergraph.graphql": "version-1",
+		},
+	}
+
+	// First rotation: current → prev-0.
+	r.rotateHistory(cm)
+	if cm.Data["supergraph.graphql.prev-0"] != "version-1" {
+		t.Errorf("expected prev-0 = version-1, got: %s", cm.Data["supergraph.graphql.prev-0"])
+	}
+
+	// Simulate update + second rotation.
+	cm.Data["supergraph.graphql"] = "version-2"
+	r.rotateHistory(cm)
+	if cm.Data["supergraph.graphql.prev-0"] != "version-2" {
+		t.Errorf("expected prev-0 = version-2, got: %s", cm.Data["supergraph.graphql.prev-0"])
+	}
+	if cm.Data["supergraph.graphql.prev-1"] != "version-1" {
+		t.Errorf("expected prev-1 = version-1, got: %s", cm.Data["supergraph.graphql.prev-1"])
+	}
+}
+
+// TestEmitEventWithNilRecorder verifies emitEvent is a safe no-op when Recorder is nil.
+func TestEmitEventWithNilRecorder(t *testing.T) {
+	r := &SubgraphSchemaReconciler{} // Recorder is nil
+	schemas := []codefiniov1alpha1.SubgraphSchema{
+		*newSubgraphSchema("svc", "default", "http://svc:8080/query", "type Query { ok: Boolean! }"),
+	}
+	// Should not panic.
+	r.emitEvent(schemas, "Normal", "Test", "test message")
+}
+
+// TestReconcileSkipsWhenSchemasUnchanged verifies the diff detection skips composition.
+func TestReconcileSkipsWhenSchemasUnchanged(t *testing.T) {
+	s := newScheme()
+	subgraph := newSubgraphSchema("svc", "default", "http://svc:8080/query", "type Query { ok: Boolean! }")
+
+	r := &SubgraphSchemaReconciler{SupergraphConfigMap: "graph-supergraph"}
+	schemasChecksum := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{*subgraph})
+
+	// Pre-create ConfigMap with matching schemas-checksum.
+	cm := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "graph-supergraph",
+			Namespace: "default",
+			Annotations: map[string]string{
+				"codefin.io/schemas-checksum":    schemasChecksum,
+				"codefin.io/supergraph-checksum": "some-supergraph-checksum",
+			},
+		},
+		Data: map[string]string{
+			"supergraph.graphql": "existing supergraph",
+		},
+	}
+
+	cl := fake.NewClientBuilder().
+		WithScheme(s).
+		WithObjects(subgraph, cm).
+		WithStatusSubresource(subgraph).
+		Build()
+
+	reconciler := &SubgraphSchemaReconciler{
+		Client:              cl,
+		Scheme:              s,
+		SupergraphConfigMap: "graph-supergraph",
+		RoverPath:           "/nonexistent/rover", // Should never be called
+	}
+
+	ctx := context.Background()
+	result, err := reconciler.Reconcile(ctx, reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: "svc", Namespace: "default"},
+	})
+	if err != nil {
+		t.Fatalf("Reconcile failed: %v", err)
+	}
+	if result.RequeueAfter != 0 {
+		t.Errorf("expected no requeue, got: %v", result.RequeueAfter)
+	}
+
+	// ConfigMap should remain unchanged.
+	var updatedCM corev1.ConfigMap
+	if err := cl.Get(ctx, types.NamespacedName{Name: "graph-supergraph", Namespace: "default"}, &updatedCM); err != nil {
+		t.Fatal(err)
+	}
+	if updatedCM.Data["supergraph.graphql"] != "existing supergraph" {
+		t.Error("expected ConfigMap to remain unchanged when schemas haven't changed")
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && containsHelper(s, substr)
 }

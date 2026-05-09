@@ -1,5 +1,9 @@
 # supergraph-operator
 
+[![CI](https://github.com/codefin-lab/supergraph-operator/actions/workflows/ci.yml/badge.svg)](https://github.com/codefin-lab/supergraph-operator/actions/workflows/ci.yml)
+[![Go](https://img.shields.io/badge/Go-1.23-blue.svg)](https://go.dev/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-green.svg)](./LICENSE)
+
 A Kubernetes operator that automatically composes an [Apollo Federation](https://www.apollographql.com/docs/federation/) supergraph when `SubgraphSchema` custom resources change. No GraphOS account required — runs entirely within your cluster.
 
 ## Features

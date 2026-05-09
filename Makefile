@@ -10,7 +10,7 @@ ENV            ?= local
 NAMESPACE      ?= $(shell grep '^namespace:' $(CHART_DIR)/values-$(ENV).yaml 2>/dev/null | awk '{print $$2}' || echo vahalla)
 
 # ── Targets ───────────────────────────────────────────
-.PHONY: help build test run docker-build docker-save deploy upgrade \
+.PHONY: help build test lint run docker-build docker-save deploy upgrade \
         k8s-restart redeploy template clean generate
 
 help: ## Show available targets
@@ -30,6 +30,11 @@ test: ## Run tests
 	@echo "Running tests..."
 	go test ./... -v -count=1
 	@echo "✅ Tests passed"
+
+lint: ## Run golangci-lint
+	@echo "Running linter..."
+	golangci-lint run ./...
+	@echo "✅ Lint passed"
 
 run: build ## Run locally (requires kubeconfig)
 	./bin/$(APP_NAME) --namespace=$(NAMESPACE)

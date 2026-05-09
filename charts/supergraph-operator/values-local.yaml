@@ -1,7 +1,7 @@
 # Local environment overrides
 controller:
   image:
-    repository: vahalla/graph-controller
+    repository: ghcr.io/codefin/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
 

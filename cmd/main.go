@@ -34,6 +34,7 @@ func main() {
 	var supergraphConfigMap string
 	var roverPath string
 	var leaderElect bool
+	var leaderElectNamespace string
 	var compositionTimeout time.Duration
 	var dryRun bool
 	var historyCount int
@@ -46,6 +47,7 @@ func main() {
 	flag.StringVar(&supergraphConfigMap, "supergraph-configmap", "graph-supergraph", "Name of the ConfigMap to store the composed supergraph.")
 	flag.StringVar(&roverPath, "rover-path", "rover", "Path to the rover CLI binary.")
 	flag.BoolVar(&leaderElect, "leader-elect", false, "Enable leader election for HA deployments.")
+	flag.StringVar(&leaderElectNamespace, "leader-elect-namespace", "", "Namespace for the leader election Lease. Defaults to --namespace if set, otherwise uses the pod's namespace.")
 	flag.DurationVar(&compositionTimeout, "composition-timeout", 2*time.Minute, "Timeout for rover compose execution.")
 	flag.BoolVar(&dryRun, "dry-run", false, "Compose but don't update ConfigMap or Deployment.")
 	flag.IntVar(&historyCount, "history-count", 0, "Number of previous supergraph versions to keep in ConfigMap (0=disabled).")
@@ -63,9 +65,17 @@ func main() {
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
 		},
-		LeaderElection:          leaderElect,
-		LeaderElectionID:        "supergraph-operator-leader",
-		LeaderElectionNamespace: namespace,
+		LeaderElection:   leaderElect,
+		LeaderElectionID: "supergraph-operator-leader",
+	}
+
+	// Resolve leader election namespace: explicit flag > --namespace > pod namespace (empty = auto-detect).
+	leNs := leaderElectNamespace
+	if leNs == "" {
+		leNs = namespace
+	}
+	if leNs != "" {
+		mgrOpts.LeaderElectionNamespace = leNs
 	}
 
 	if namespace != "" {
