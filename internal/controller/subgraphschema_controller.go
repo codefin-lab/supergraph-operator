@@ -21,7 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vahallav1alpha1 "github.com/vahalla-wealth/graph-controller/api/v1alpha1"
+	codefiniov1alpha1 "github.com/codefin/supergraph-operator/api/v1alpha1"
 )
 
 // SubgraphSchemaReconciler reconciles SubgraphSchema objects.
@@ -35,8 +35,8 @@ type SubgraphSchemaReconciler struct {
 	RoverPath           string
 }
 
-// +kubebuilder:rbac:groups=vahalla.app,resources=subgraphschemas,verbs=get;list;watch;update;patch
-// +kubebuilder:rbac:groups=vahalla.app,resources=subgraphschemas/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=codefin.io,resources=subgraphschemas,verbs=get;list;watch;update;patch
+// +kubebuilder:rbac:groups=codefin.io,resources=subgraphschemas/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;patch
 
@@ -45,7 +45,7 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	logger.Info("reconciling SubgraphSchema", "name", req.NamespacedName)
 
 	// 1. List all SubgraphSchema CRs in the namespace.
-	var schemas vahallav1alpha1.SubgraphSchemaList
+	var schemas codefiniov1alpha1.SubgraphSchemaList
 	if err := r.List(ctx, &schemas, client.InNamespace(req.Namespace)); err != nil {
 		logger.Error(err, "unable to list SubgraphSchemas")
 		return ctrl.Result{}, err
@@ -60,7 +60,7 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	supergraphSDL, err := r.compose(ctx, schemas.Items)
 	if err != nil {
 		logger.Error(err, "supergraph composition failed")
-		r.updateAllStatuses(ctx, schemas.Items, vahallav1alpha1.CompositionStatusFailed, "", err.Error())
+		r.updateAllStatuses(ctx, schemas.Items, codefiniov1alpha1.CompositionStatusFailed, "", err.Error())
 		return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
 	}
 
@@ -80,13 +80,13 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	}
 
 	// 5. Update status on all SubgraphSchema CRs.
-	r.updateAllStatuses(ctx, schemas.Items, vahallav1alpha1.CompositionStatusSuccess, checksum, "Composition succeeded")
+	r.updateAllStatuses(ctx, schemas.Items, codefiniov1alpha1.CompositionStatusSuccess, checksum, "Composition succeeded")
 
 	return ctrl.Result{}, nil
 }
 
 // compose writes schemas to a temp directory, generates a rover config, and runs rover supergraph compose.
-func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []vahallav1alpha1.SubgraphSchema) (string, error) {
+func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []codefiniov1alpha1.SubgraphSchema) (string, error) {
 	logger := log.FromContext(ctx)
 
 	tmpDir, err := os.MkdirTemp("", "supergraph-compose-*")
@@ -174,11 +174,11 @@ func (r *SubgraphSchemaReconciler) upsertConfigMap(ctx context.Context, namespac
 				Name:      cmName,
 				Namespace: namespace,
 				Labels: map[string]string{
-					"app.kubernetes.io/managed-by": "graph-controller",
-					"app.kubernetes.io/part-of":    "vahalla",
+					"app.kubernetes.io/managed-by": "supergraph-operator",
+					"app.kubernetes.io/part-of":    "supergraph-operator",
 				},
 				Annotations: map[string]string{
-					"vahalla.app/supergraph-checksum": checksum,
+					"codefin.io/supergraph-checksum": checksum,
 				},
 			},
 			Data: map[string]string{
@@ -192,7 +192,7 @@ func (r *SubgraphSchemaReconciler) upsertConfigMap(ctx context.Context, namespac
 	if cm.Annotations == nil {
 		cm.Annotations = map[string]string{}
 	}
-	cm.Annotations["vahalla.app/supergraph-checksum"] = checksum
+	cm.Annotations["codefin.io/supergraph-checksum"] = checksum
 	if cm.Data == nil {
 		cm.Data = map[string]string{}
 	}
@@ -220,7 +220,7 @@ func (r *SubgraphSchemaReconciler) patchDeployment(ctx context.Context, namespac
 	// Only patch if the checksum actually changed.
 	currentChecksum := ""
 	if deploy.Spec.Template.Annotations != nil {
-		currentChecksum = deploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"]
+		currentChecksum = deploy.Spec.Template.Annotations["codefin.io/supergraph-checksum"]
 	}
 	if currentChecksum == checksum {
 		return nil
@@ -230,15 +230,15 @@ func (r *SubgraphSchemaReconciler) patchDeployment(ctx context.Context, namespac
 	if deploy.Spec.Template.Annotations == nil {
 		deploy.Spec.Template.Annotations = map[string]string{}
 	}
-	deploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"] = checksum
+	deploy.Spec.Template.Annotations["codefin.io/supergraph-checksum"] = checksum
 	return r.Patch(ctx, &deploy, patch)
 }
 
 // updateAllStatuses updates the status of all SubgraphSchema CRs.
 func (r *SubgraphSchemaReconciler) updateAllStatuses(
 	ctx context.Context,
-	schemas []vahallav1alpha1.SubgraphSchema,
-	status vahallav1alpha1.CompositionStatus,
+	schemas []codefiniov1alpha1.SubgraphSchema,
+	status codefiniov1alpha1.CompositionStatus,
 	checksum string,
 	message string,
 ) {
@@ -249,7 +249,7 @@ func (r *SubgraphSchemaReconciler) updateAllStatuses(
 		schemas[i].Status.CompositionStatus = status
 		schemas[i].Status.Message = message
 		schemas[i].Status.SupergraphChecksum = checksum
-		if status == vahallav1alpha1.CompositionStatusSuccess {
+		if status == codefiniov1alpha1.CompositionStatusSuccess {
 			schemas[i].Status.LastComposed = &now
 		}
 		if err := r.Status().Update(ctx, &schemas[i]); err != nil {
@@ -261,6 +261,6 @@ func (r *SubgraphSchemaReconciler) updateAllStatuses(
 // SetupWithManager sets up the controller with the Manager.
 func (r *SubgraphSchemaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&vahallav1alpha1.SubgraphSchema{}).
+		For(&codefiniov1alpha1.SubgraphSchema{}).
 		Complete(r)
 }

@@ -18,23 +18,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	vahallav1alpha1 "github.com/vahalla-wealth/graph-controller/api/v1alpha1"
+	codefiniov1alpha1 "github.com/codefin/supergraph-operator/api/v1alpha1"
 )
 
 func newScheme() *runtime.Scheme {
 	s := runtime.NewScheme()
 	_ = clientgoscheme.AddToScheme(s)
-	_ = vahallav1alpha1.AddToScheme(s)
+	_ = codefiniov1alpha1.AddToScheme(s)
 	return s
 }
 
-func newSubgraphSchema(name, namespace, routingUrl, schema string) *vahallav1alpha1.SubgraphSchema {
-	return &vahallav1alpha1.SubgraphSchema{
+func newSubgraphSchema(name, namespace, routingUrl, schema string) *codefiniov1alpha1.SubgraphSchema {
+	return &codefiniov1alpha1.SubgraphSchema{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: namespace,
 		},
-		Spec: vahallav1alpha1.SubgraphSchemaSpec{
+		Spec: codefiniov1alpha1.SubgraphSchemaSpec{
 			RoutingUrl: routingUrl,
 			Schema:     schema,
 		},
@@ -104,7 +104,7 @@ cat "$CONFIG" >> "$OUTPUT"
 		RoverPath:         mockRover,
 	}
 
-	schemas := []vahallav1alpha1.SubgraphSchema{
+	schemas := []codefiniov1alpha1.SubgraphSchema{
 		*newSubgraphSchema("crm-service", "default", "http://crm-service:8080/query",
 			"type Query { health: String! }"),
 		*newSubgraphSchema("identity-service", "default", "http://identity-service:8080/query",
@@ -162,8 +162,8 @@ func TestUpsertConfigMapCreates(t *testing.T) {
 	if cm.Data["supergraph.graphql"] != sdl {
 		t.Errorf("expected ConfigMap data to contain SDL, got: %s", cm.Data["supergraph.graphql"])
 	}
-	if cm.Annotations["vahalla.app/supergraph-checksum"] != checksum {
-		t.Errorf("expected checksum annotation %s, got: %s", checksum, cm.Annotations["vahalla.app/supergraph-checksum"])
+	if cm.Annotations["codefin.io/supergraph-checksum"] != checksum {
+		t.Errorf("expected checksum annotation %s, got: %s", checksum, cm.Annotations["codefin.io/supergraph-checksum"])
 	}
 }
 
@@ -175,7 +175,7 @@ func TestUpsertConfigMapUpdates(t *testing.T) {
 			Name:      "graph-supergraph",
 			Namespace: "default",
 			Annotations: map[string]string{
-				"vahalla.app/supergraph-checksum": "old-checksum",
+				"codefin.io/supergraph-checksum": "old-checksum",
 			},
 		},
 		Data: map[string]string{
@@ -206,8 +206,8 @@ func TestUpsertConfigMapUpdates(t *testing.T) {
 	if cm.Data["supergraph.graphql"] != newSDL {
 		t.Errorf("expected updated SDL, got: %s", cm.Data["supergraph.graphql"])
 	}
-	if cm.Annotations["vahalla.app/supergraph-checksum"] != newChecksum {
-		t.Errorf("expected new checksum, got: %s", cm.Annotations["vahalla.app/supergraph-checksum"])
+	if cm.Annotations["codefin.io/supergraph-checksum"] != newChecksum {
+		t.Errorf("expected new checksum, got: %s", cm.Annotations["codefin.io/supergraph-checksum"])
 	}
 }
 
@@ -236,7 +236,7 @@ func TestPatchDeploymentUpdatesAnnotation(t *testing.T) {
 		t.Fatalf("failed to get deployment: %v", err)
 	}
 
-	got := updated.Spec.Template.Annotations["vahalla.app/supergraph-checksum"]
+	got := updated.Spec.Template.Annotations["codefin.io/supergraph-checksum"]
 	if got != checksum {
 		t.Errorf("expected annotation %s, got: %s", checksum, got)
 	}
@@ -248,7 +248,7 @@ func TestPatchDeploymentSkipsWhenSameChecksum(t *testing.T) {
 	s := newScheme()
 	deploy := newRouterDeployment("default")
 	deploy.Spec.Template.Annotations = map[string]string{
-		"vahalla.app/supergraph-checksum": "same-checksum",
+		"codefin.io/supergraph-checksum": "same-checksum",
 	}
 	cl := fake.NewClientBuilder().WithScheme(s).WithObjects(deploy).Build()
 
@@ -345,16 +345,16 @@ echo "# mock supergraph" > "$OUTPUT"
 	if err := cl.Get(ctx, types.NamespacedName{Name: "graph-router", Namespace: "default"}, &updatedDeploy); err != nil {
 		t.Fatalf("failed to get deployment: %v", err)
 	}
-	if updatedDeploy.Spec.Template.Annotations["vahalla.app/supergraph-checksum"] == "" {
+	if updatedDeploy.Spec.Template.Annotations["codefin.io/supergraph-checksum"] == "" {
 		t.Error("expected checksum annotation on deployment")
 	}
 
 	// Verify SubgraphSchema status was updated.
-	var updatedSchema vahallav1alpha1.SubgraphSchema
+	var updatedSchema codefiniov1alpha1.SubgraphSchema
 	if err := cl.Get(ctx, types.NamespacedName{Name: "crm-service", Namespace: "default"}, &updatedSchema); err != nil {
 		t.Fatalf("failed to get SubgraphSchema: %v", err)
 	}
-	if updatedSchema.Status.CompositionStatus != vahallav1alpha1.CompositionStatusSuccess {
+	if updatedSchema.Status.CompositionStatus != codefiniov1alpha1.CompositionStatusSuccess {
 		t.Errorf("expected Success status, got: %s", updatedSchema.Status.CompositionStatus)
 	}
 }
@@ -420,11 +420,11 @@ func TestReconcileCompositionFailure(t *testing.T) {
 	}
 
 	// Verify status was set to Failed.
-	var updatedSchema vahallav1alpha1.SubgraphSchema
+	var updatedSchema codefiniov1alpha1.SubgraphSchema
 	if err := cl.Get(ctx, types.NamespacedName{Name: "bad-service", Namespace: "default"}, &updatedSchema); err != nil {
 		t.Fatalf("failed to get SubgraphSchema: %v", err)
 	}
-	if updatedSchema.Status.CompositionStatus != vahallav1alpha1.CompositionStatusFailed {
+	if updatedSchema.Status.CompositionStatus != codefiniov1alpha1.CompositionStatusFailed {
 		t.Errorf("expected Failed status, got: %s", updatedSchema.Status.CompositionStatus)
 	}
 }

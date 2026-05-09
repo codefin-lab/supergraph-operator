@@ -1,4 +1,4 @@
-module github.com/vahalla-wealth/graph-controller
+module github.com/codefin/supergraph-operator
 
 go 1.23.0
 

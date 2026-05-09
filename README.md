@@ -1,6 +1,6 @@
-# Graph Controller
+# supergraph-operator
 
-Kubernetes controller that automatically composes an Apollo Federation supergraph when `SubgraphSchema` custom resources change.
+A Kubernetes operator that automatically composes an [Apollo Federation](https://www.apollographql.com/docs/federation/) supergraph when `SubgraphSchema` custom resources change. No GraphOS account required — runs entirely within your cluster.
 
 ## How It Works
 
@@ -8,11 +8,11 @@ Kubernetes controller that automatically composes an Apollo Federation supergrap
 2. The controller watches for `SubgraphSchema` create/update/delete events
 3. On any change, it lists all `SubgraphSchema` resources, generates a rover config, and runs `rover supergraph compose`
 4. The composed supergraph SDL is written to a ConfigMap (default: `graph-supergraph`)
-5. The router Deployment is patched with a checksum annotation (`vahalla.app/supergraph-checksum`) to trigger a rolling restart
+5. The router Deployment is patched with a checksum annotation (`codefin.io/supergraph-checksum`) to trigger a rolling restart
 
 ## CRD: SubgraphSchema
 
-**API Group:** `vahalla.app/v1alpha1`
+**API Group:** `codefin.io/v1alpha1`
 
 ### Spec Fields
 
@@ -33,11 +33,11 @@ Kubernetes controller that automatically composes an Apollo Federation supergrap
 ### Example: Single Subgraph
 
 ```yaml
-apiVersion: vahalla.app/v1alpha1
+apiVersion: codefin.io/v1alpha1
 kind: SubgraphSchema
 metadata:
   name: crm-service
-  namespace: vahalla-local
+  namespace: default
 spec:
   routingUrl: "http://crm-service:8080/query"
   schema: |
@@ -55,11 +55,11 @@ spec:
 ### Example: Multiple Subgraphs
 
 ```yaml
-apiVersion: vahalla.app/v1alpha1
+apiVersion: codefin.io/v1alpha1
 kind: SubgraphSchema
 metadata:
   name: identity-service
-  namespace: vahalla-local
+  namespace: default
 spec:
   routingUrl: "http://identity-service:8080/query"
   schema: |
@@ -72,11 +72,11 @@ spec:
       role: String!
     }
 ---
-apiVersion: vahalla.app/v1alpha1
+apiVersion: codefin.io/v1alpha1
 kind: SubgraphSchema
 metadata:
   name: crm-service
-  namespace: vahalla-local
+  namespace: default
 spec:
   routingUrl: "http://crm-service:8080/query"
   schema: |
@@ -96,7 +96,7 @@ spec:
 ### Checking Status
 
 ```bash
-kubectl get subgraphschemas -n vahalla-local
+kubectl get subgraphschemas -n default
 ```
 
 ```text
@@ -127,7 +127,7 @@ Configuration is managed via `values.yaml` and per-environment overrides:
 # values.yaml (defaults)
 controller:
   image:
-    repository: vahalla/graph-controller
+    repository: ghcr.io/codefin/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
   replicas: 1
@@ -152,7 +152,7 @@ Per-environment overrides (e.g. `values-local.yaml`):
 ```yaml
 controller:
   image:
-    repository: vahalla/graph-controller
+    repository: ghcr.io/codefin/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
 
@@ -166,21 +166,18 @@ namespace: vahalla-local
 ## Quick Start
 
 ```bash
-# 1. Install CRD
-kubectl apply -f config/crd/bases/
-
-# 2. Build and test
+# 1. Build and test
 make build
 make test
 
-# 3. Run locally (requires kubeconfig + CRD installed)
-make run
-
-# 4. Deploy to Kubernetes
+# 2. Deploy to Kubernetes (builds image + installs Helm chart with CRD)
 make deploy ENV=local
 
-# 5. Check status
-kubectl get subgraphschemas -n vahalla-local
+# 3. Apply a SubgraphSchema CR
+kubectl apply -f examples/subgraph.yaml
+
+# 4. Check status
+kubectl get subgraphschemas
 ```
 
 ## Development
@@ -216,7 +213,7 @@ make template ENV=local
 ├── cmd/                   # Entry point (CLI flags, manager setup)
 ├── internal/controller/   # Reconcile logic (compose, configmap, deploy patch)
 ├── charts/                # Helm chart (CRD + RBAC + Deployment)
-│   └── graph-controller/
+│   └── supergraph-operator/
 │       ├── templates/     # crd.yaml, rbac.yaml, deployment.yaml
 │       ├── values.yaml    # Default config
 │       ├── values-local.yaml
@@ -243,19 +240,29 @@ make template ENV=local
 
 All deploy/template targets accept `ENV=local|dev|demo|prod`.
 
-## Integration with vahalla-mono
+## Integration
 
-Add as a git submodule:
+Each subgraph service should include a `SubgraphSchema` resource in its Helm chart:
 
-```bash
-cd vahalla-mono
-git submodule add <repo-url> services/graph-controller
+```yaml
+apiVersion: codefin.io/v1alpha1
+kind: SubgraphSchema
+metadata:
+  name: my-service
+  namespace: {{ .Values.namespace }}
+spec:
+  routingUrl: "http://my-service:8080/query"
+  schema: |
+    {{ .Files.Get "schema.graphqls" | nindent 4 }}
 ```
 
 Deploy order:
-
 ```bash
-make svc-deploy s=graph-controller env=local  # CRD + controller first
-make svc-deploy s=crm env=local               # creates SubgraphSchema CR
-make svc-deploy s=graph env=local              # router reads composed supergraph
+make deploy ENV=local          # CRD + controller first
+# Then deploy subgraph services — each creates a SubgraphSchema CR
+# Controller auto-composes and updates the router
 ```
+
+## License
+
+Apache License 2.0 — see [LICENSE](./LICENSE)

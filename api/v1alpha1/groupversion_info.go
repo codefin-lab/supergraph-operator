@@ -1,5 +1,5 @@
 // +kubebuilder:object:generate=true
-// +groupName=vahalla.app
+// +groupName=codefin.io
 
 package v1alpha1
 
@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	GroupVersion = schema.GroupVersion{Group: "vahalla.app", Version: "v1alpha1"}
+	GroupVersion = schema.GroupVersion{Group: "codefin.io", Version: "v1alpha1"}
 
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}
 

@@ -12,15 +12,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	vahallav1alpha1 "github.com/vahalla-wealth/graph-controller/api/v1alpha1"
-	"github.com/vahalla-wealth/graph-controller/internal/controller"
+	codefiniov1alpha1 "github.com/codefin/supergraph-operator/api/v1alpha1"
+	"github.com/codefin/supergraph-operator/internal/controller"
 )
 
 var scheme = runtime.NewScheme()
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(vahallav1alpha1.AddToScheme(scheme))
+	utilruntime.Must(codefiniov1alpha1.AddToScheme(scheme))
 }
 
 func main() {

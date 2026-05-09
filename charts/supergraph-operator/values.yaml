@@ -1,7 +1,7 @@
 # Graph Controller Configuration
 controller:
   image:
-    repository: vahalla/graph-controller
+    repository: ghcr.io/codefin/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
   replicas: 1
