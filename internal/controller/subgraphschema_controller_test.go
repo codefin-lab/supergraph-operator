@@ -100,7 +100,7 @@ cat "$CONFIG" >> "$OUTPUT"
 	reconciler := &SubgraphSchemaReconciler{
 		Client:            fake.NewClientBuilder().WithScheme(s).Build(),
 		Scheme:            s,
-		FederationVersion: "=2.7.0",
+		FederationVersion: "=2.13.0",
 		RoverPath:         mockRover,
 	}
 
@@ -128,7 +128,7 @@ cat "$CONFIG" >> "$OUTPUT"
 		t.Errorf("expected composed output to contain 'identity-service:', got:\n%s", result)
 	}
 	// Verify federation version is present.
-	if !contains(result, "federation_version: =2.7.0") {
+	if !contains(result, "federation_version: =2.13.0") {
 		t.Errorf("expected composed output to contain federation_version, got:\n%s", result)
 	}
 }

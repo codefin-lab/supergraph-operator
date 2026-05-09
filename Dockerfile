@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /supergraph-operator .
 # Rover stage — download pre-built binary from GitHub Releases (supports amd64 + arm64)
 FROM alpine:3.20 AS rover-installer
 
-ARG ROVER_VERSION=0.27.3
+ARG ROVER_VERSION=0.38.1
 ARG TARGETARCH
 
 RUN apk add --no-cache curl tar && \

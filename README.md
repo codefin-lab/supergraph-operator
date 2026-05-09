@@ -129,7 +129,7 @@ The controller accepts the following CLI flags:
 | Flag | Default | Description |
 |---|---|---|
 | `--namespace` | _(all namespaces)_ | Namespace to watch; empty = watch all namespaces |
-| `--federation-version` | `=2.7.0` | Apollo Federation version passed to `rover compose` |
+| `--federation-version` | `=2.13.0` | Apollo Federation version passed to `rover compose` |
 | `--router-deployment` | `graph-router` | Name of the router Deployment to patch on composition |
 | `--supergraph-configmap` | `graph-supergraph` | Name of the ConfigMap to store the composed supergraph |
 | `--rover-path` | `rover` | Path to the `rover` CLI binary |
@@ -161,7 +161,7 @@ controller:
       cpu: "250m"
 
 config:
-  federationVersion: "=2.7.0"
+  federationVersion: "=2.13.0"
   routerDeployment: "graph-router"
   supergraphConfigMap: "graph-supergraph"
   compositionTimeout: "2m"

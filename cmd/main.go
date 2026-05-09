@@ -42,7 +42,7 @@ func main() {
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace to watch. If empty, watches all namespaces.")
-	flag.StringVar(&federationVersion, "federation-version", "=2.7.0", "Apollo Federation version for composition.")
+	flag.StringVar(&federationVersion, "federation-version", "=2.13.0", "Apollo Federation version for composition.")
 	flag.StringVar(&routerDeployment, "router-deployment", "graph-router", "Name of the router Deployment to patch on composition.")
 	flag.StringVar(&supergraphConfigMap, "supergraph-configmap", "graph-supergraph", "Name of the ConfigMap to store the composed supergraph.")
 	flag.StringVar(&roverPath, "rover-path", "rover", "Path to the rover CLI binary.")

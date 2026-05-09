@@ -15,7 +15,7 @@ controller:
 
 # Controller flags
 config:
-  federationVersion: "=2.7.0"
+  federationVersion: "=2.13.0"
   routerDeployment: "graph-router"
   supergraphConfigMap: "graph-supergraph"
   compositionTimeout: "2m"

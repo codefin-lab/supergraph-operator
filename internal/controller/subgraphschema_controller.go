@@ -143,7 +143,7 @@ func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []codefi
 	var configLines []string
 	fedVersion := r.FederationVersion
 	if fedVersion == "" {
-		fedVersion = "=2.7.0"
+		fedVersion = "=2.13.0"
 	}
 	configLines = append(configLines, fmt.Sprintf("federation_version: %s", fedVersion))
 	configLines = append(configLines, "subgraphs:")
