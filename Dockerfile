@@ -10,15 +10,21 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /supergraph-operator ./cmd/main.go
 
-# Rover stage — download rover CLI
-FROM ghcr.io/apollographql/rover:latest AS rover
+# Rover stage — download rover CLI via official installer
+FROM alpine:3.20 AS rover-installer
+
+ARG ROVER_VERSION=0.27.3
+
+RUN apk add --no-cache curl && \
+    curl -sSL https://rover.apollo.dev/nix/${ROVER_VERSION} | sh && \
+    mv /root/.rover/bin/rover /usr/local/bin/rover
 
 # Runtime stage
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates tini curl
+RUN apk add --no-cache ca-certificates tini
 
-COPY --from=rover /usr/local/bin/rover /usr/local/bin/rover
+COPY --from=rover-installer /usr/local/bin/rover /usr/local/bin/rover
 COPY --from=builder /supergraph-operator /usr/local/bin/supergraph-operator
 
 USER 65532:65532
