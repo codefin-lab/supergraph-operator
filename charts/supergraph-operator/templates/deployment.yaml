@@ -32,6 +32,7 @@ spec:
             capabilities:
               drop:
                 - ALL
+          command: ["/usr/bin/tini", "--", "supergraph-operator"]
           args:
             - "--namespace={{ .Values.namespace }}"
             - "--federation-version={{ .Values.config.federationVersion }}"
