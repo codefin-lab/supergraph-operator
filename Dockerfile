@@ -16,14 +16,16 @@ FROM alpine:3.20 AS rover-installer
 ARG ROVER_VERSION=0.38.1
 ARG TARGETARCH
 
-RUN apk add --no-cache curl tar && \
+RUN apk add --no-cache curl && \
     case "${TARGETARCH}" in \
       amd64) ARCH="x86_64-unknown-linux-musl" ;; \
       arm64) ARCH="aarch64-unknown-linux-musl" ;; \
       *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac && \
     curl -sSL "https://github.com/apollographql/rover/releases/download/v${ROVER_VERSION}/rover-v${ROVER_VERSION}-${ARCH}.tar.gz" \
-      | tar -xz --strip-components=1 -C /usr/local/bin dist/rover
+      | tar -xz && \
+    mv dist/rover /usr/local/bin/rover && \
+    rm -rf dist
 
 # Runtime stage
 FROM alpine:3.20
