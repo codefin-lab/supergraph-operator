@@ -23,7 +23,7 @@ RUN apk add --no-cache curl tar && \
       *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
     esac && \
     curl -sSL "https://github.com/apollographql/rover/releases/download/v${ROVER_VERSION}/rover-v${ROVER_VERSION}-${ARCH}.tar.gz" \
-      | tar -xz -C /usr/local/bin rover
+      | tar -xz --strip-components=1 -C /usr/local/bin dist/rover
 
 # Runtime stage
 FROM alpine:3.20
