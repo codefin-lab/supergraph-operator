@@ -17,10 +17,21 @@ spec:
         {{- include "supergraph-operator.controller.labels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "supergraph-operator.fullname" . }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
       containers:
         - name: controller
           image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}"
           imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           args:
             - "--namespace={{ .Values.namespace }}"
             - "--federation-version={{ .Values.config.federationVersion }}"
@@ -55,5 +66,11 @@ spec:
               port: health
             initialDelaySeconds: 5
             periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           resources:
             {{- toYaml .Values.controller.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
