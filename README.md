@@ -148,7 +148,7 @@ Configuration is managed via `values.yaml` and per-environment overrides:
 # values.yaml (defaults)
 controller:
   image:
-    repository: ghcr.io/codefin/supergraph-operator
+    repository: ghcr.io/codefin-lab/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
   replicas: 1
@@ -177,7 +177,7 @@ Per-environment overrides (e.g. `values-local.yaml`):
 ```yaml
 controller:
   image:
-    repository: ghcr.io/codefin/supergraph-operator
+    repository: ghcr.io/codefin-lab/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
 
@@ -310,7 +310,7 @@ make deploy ENV=local          # CRD + controller first
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`) — runs on push/PR to `main`: `go test`, `go build`, `helm lint`
-- **Release** (`.github/workflows/release.yml`) — runs on tag `v*`: test → build + push Docker image to `ghcr.io/codefin/supergraph-operator` → package + push Helm chart to OCI registry
+- **Release** (`.github/workflows/release.yml`) — runs on tag `v*`: test → build + push Docker image to `ghcr.io/codefin-lab/supergraph-operator` → package + push Helm chart to OCI registry
 
 To release:
 

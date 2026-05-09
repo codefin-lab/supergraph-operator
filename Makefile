@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 # ── Config ────────────────────────────────────────────
 APP_NAME       := supergraph-operator
-IMAGE_NAME     := ghcr.io/codefin/$(APP_NAME)
+IMAGE_NAME     := ghcr.io/codefin-lab/$(APP_NAME)
 IMAGE_TAG      ?= latest
 CHART_DIR      := charts/$(APP_NAME)
 RELEASE_NAME   := $(APP_NAME)

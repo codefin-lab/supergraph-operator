@@ -1,7 +1,7 @@
 # Local environment overrides
 controller:
   image:
-    repository: ghcr.io/codefin/supergraph-operator
+    repository: ghcr.io/codefin-lab/supergraph-operator
     tag: "latest"
     pullPolicy: IfNotPresent
 

@@ -10,7 +10,7 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: codefin/supergraph-operator
+  IMAGE_NAME: codefin-lab/supergraph-operator
 
 jobs:
   release:
@@ -64,4 +64,4 @@ jobs:
       - name: Push Helm chart to OCI registry
         run: |
           helm push supergraph-operator-${{ steps.version.outputs.tag }}.tgz \
-            oci://${{ env.REGISTRY }}/codefin/charts
+            oci://${{ env.REGISTRY }}/codefin-lab/charts
