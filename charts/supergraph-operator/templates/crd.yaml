@@ -51,14 +51,30 @@ spec:
               type: object
               required:
                 - routingUrl
-                - schema
               properties:
                 routingUrl:
                   description: URL where the subgraph can be reached by the router.
                   type: string
                 schema:
-                  description: Full GraphQL SDL for this subgraph.
+                  description: Inline GraphQL SDL for this subgraph. Either schema or schemaFrom must be set.
                   type: string
+                schemaFrom:
+                  description: Load GraphQL SDL from an external source. Either schema or schemaFrom must be set.
+                  type: object
+                  properties:
+                    configMapRef:
+                      description: Load schema SDL from a ConfigMap key.
+                      type: object
+                      required:
+                        - name
+                        - key
+                      properties:
+                        name:
+                          description: Name of the ConfigMap.
+                          type: string
+                        key:
+                          description: Key within the ConfigMap.
+                          type: string
             status:
               description: SubgraphSchemaStatus defines the observed state after composition.
               type: object

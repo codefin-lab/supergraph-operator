@@ -4,15 +4,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// ConfigMapKeyRef selects a key from a ConfigMap.
+type ConfigMapKeyRef struct {
+	// Name of the ConfigMap.
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Key within the ConfigMap.
+	// +kubebuilder:validation:Required
+	Key string `json:"key"`
+}
+
+// SchemaSource defines where to load the GraphQL SDL from.
+type SchemaSource struct {
+	// ConfigMapRef loads the schema SDL from a ConfigMap key.
+	// +optional
+	ConfigMapRef *ConfigMapKeyRef `json:"configMapRef,omitempty"`
+}
+
 // SubgraphSchemaSpec defines the desired state of a federation subgraph.
 type SubgraphSchemaSpec struct {
 	// RoutingUrl is the URL where the subgraph can be reached by the router.
 	// +kubebuilder:validation:Required
 	RoutingUrl string `json:"routingUrl"`
 
-	// Schema is the full GraphQL SDL for this subgraph.
-	// +kubebuilder:validation:Required
-	Schema string `json:"schema"`
+	// Schema is the inline GraphQL SDL for this subgraph.
+	// Either Schema or SchemaFrom must be set.
+	// +optional
+	Schema string `json:"schema,omitempty"`
+
+	// SchemaFrom loads the GraphQL SDL from an external source (e.g. ConfigMap).
+	// Either Schema or SchemaFrom must be set.
+	// +optional
+	SchemaFrom *SchemaSource `json:"schemaFrom,omitempty"`
 }
 
 // CompositionStatus represents the result of a supergraph composition.

@@ -20,7 +20,9 @@ import (
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	codefiniov1alpha1 "github.com/codefin/supergraph-operator/api/v1alpha1"
 	operatormetrics "github.com/codefin/supergraph-operator/internal/metrics"
@@ -149,8 +151,12 @@ func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []codefi
 	configLines = append(configLines, "subgraphs:")
 
 	for _, s := range schemas {
+		sdl, err := r.resolveSchema(ctx, s)
+		if err != nil {
+			return "", fmt.Errorf("resolving schema for %s: %w", s.Name, err)
+		}
 		schemaFile := filepath.Join(tmpDir, s.Name+".graphqls")
-		if err := os.WriteFile(schemaFile, []byte(s.Spec.Schema), 0644); err != nil {
+		if err := os.WriteFile(schemaFile, []byte(sdl), 0644); err != nil {
 			return "", fmt.Errorf("writing schema for %s: %w", s.Name, err)
 		}
 		configLines = append(configLines, fmt.Sprintf("  %s:", s.Name))
@@ -323,6 +329,26 @@ func (r *SubgraphSchemaReconciler) updateAllStatuses(
 	}
 }
 
+// resolveSchema returns the SDL for a SubgraphSchema, loading from ConfigMapRef if set.
+func (r *SubgraphSchemaReconciler) resolveSchema(ctx context.Context, s codefiniov1alpha1.SubgraphSchema) (string, error) {
+	if s.Spec.SchemaFrom != nil && s.Spec.SchemaFrom.ConfigMapRef != nil {
+		ref := s.Spec.SchemaFrom.ConfigMapRef
+		var cm corev1.ConfigMap
+		if err := r.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: s.Namespace}, &cm); err != nil {
+			return "", fmt.Errorf("getting ConfigMap %s: %w", ref.Name, err)
+		}
+		sdl, ok := cm.Data[ref.Key]
+		if !ok {
+			return "", fmt.Errorf("key %q not found in ConfigMap %s", ref.Key, ref.Name)
+		}
+		return sdl, nil
+	}
+	if s.Spec.Schema == "" {
+		return "", fmt.Errorf("either spec.schema or spec.schemaFrom.configMapRef must be set")
+	}
+	return s.Spec.Schema, nil
+}
+
 // computeSchemasChecksum returns a deterministic SHA-256 of all schema specs (sorted by name).
 func (r *SubgraphSchemaReconciler) computeSchemasChecksum(schemas []codefiniov1alpha1.SubgraphSchema) string {
 	sorted := make([]codefiniov1alpha1.SubgraphSchema, len(schemas))
@@ -336,6 +362,10 @@ func (r *SubgraphSchemaReconciler) computeSchemasChecksum(schemas []codefiniov1a
 		h.Write([]byte(s.Name))
 		h.Write([]byte(s.Spec.RoutingUrl))
 		h.Write([]byte(s.Spec.Schema))
+		if s.Spec.SchemaFrom != nil && s.Spec.SchemaFrom.ConfigMapRef != nil {
+			h.Write([]byte(s.Spec.SchemaFrom.ConfigMapRef.Name))
+			h.Write([]byte(s.Spec.SchemaFrom.ConfigMapRef.Key))
+		}
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
@@ -371,5 +401,26 @@ func (r *SubgraphSchemaReconciler) emitEvent(schemas []codefiniov1alpha1.Subgrap
 func (r *SubgraphSchemaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&codefiniov1alpha1.SubgraphSchema{}).
+		Watches(&corev1.ConfigMap{}, handler.EnqueueRequestsFromMapFunc(r.configMapToSubgraphSchemas)).
 		Complete(r)
+}
+
+// configMapToSubgraphSchemas maps a ConfigMap change to all SubgraphSchemas that reference it.
+func (r *SubgraphSchemaReconciler) configMapToSubgraphSchemas(ctx context.Context, obj client.Object) []reconcile.Request {
+	cm := obj.(*corev1.ConfigMap)
+	var schemas codefiniov1alpha1.SubgraphSchemaList
+	if err := r.List(ctx, &schemas, client.InNamespace(cm.Namespace)); err != nil {
+		return nil
+	}
+	var requests []reconcile.Request
+	for _, s := range schemas.Items {
+		if s.Spec.SchemaFrom != nil && s.Spec.SchemaFrom.ConfigMapRef != nil {
+			if s.Spec.SchemaFrom.ConfigMapRef.Name == cm.Name {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{Name: s.Name, Namespace: s.Namespace},
+				})
+			}
+		}
+	}
+	return requests
 }
