@@ -85,8 +85,7 @@ jobs:
       - name: Package Helm chart
         run: |
           helm package charts/supergraph-operator \
-            --version ${{ steps.version.outputs.tag }} \
-            --app-version ${{ steps.version.outputs.tag }}
+            --version ${{ steps.version.outputs.tag }}
 
       - name: Push Helm chart to OCI registry
         run: |
