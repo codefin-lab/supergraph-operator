@@ -111,7 +111,11 @@ cat "$CONFIG" >> "$OUTPUT"
 			"type Query { me: User } type User { id: ID! }"),
 	}
 
-	result, err := reconciler.compose(context.Background(), schemas)
+	resolvedSDLs := map[string]string{}
+	for _, s := range schemas {
+		resolvedSDLs[s.Name] = s.Spec.Schema
+	}
+	result, err := reconciler.composeFromResolved(context.Background(), schemas, resolvedSDLs)
 	if err != nil {
 		t.Fatalf("compose failed: %v", err)
 	}
@@ -436,8 +440,9 @@ func TestComputeSchemasChecksum(t *testing.T) {
 	a := *newSubgraphSchema("aaa", "default", "http://aaa:8080/query", "type Query { a: String! }")
 	b := *newSubgraphSchema("bbb", "default", "http://bbb:8080/query", "type Query { b: String! }")
 
-	hash1 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{a, b})
-	hash2 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{b, a})
+	resolvedAB := map[string]string{"aaa": a.Spec.Schema, "bbb": b.Spec.Schema}
+	hash1 := r.computeSchemasChecksumFromResolved([]codefiniov1alpha1.SubgraphSchema{a, b}, resolvedAB)
+	hash2 := r.computeSchemasChecksumFromResolved([]codefiniov1alpha1.SubgraphSchema{b, a}, resolvedAB)
 
 	if hash1 != hash2 {
 		t.Errorf("expected same checksum regardless of order, got %s vs %s", hash1, hash2)
@@ -445,7 +450,8 @@ func TestComputeSchemasChecksum(t *testing.T) {
 
 	// Changing schema content should change checksum.
 	c := *newSubgraphSchema("aaa", "default", "http://aaa:8080/query", "type Query { changed: Boolean! }")
-	hash3 := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{c, b})
+	resolvedCB := map[string]string{"aaa": c.Spec.Schema, "bbb": b.Spec.Schema}
+	hash3 := r.computeSchemasChecksumFromResolved([]codefiniov1alpha1.SubgraphSchema{c, b}, resolvedCB)
 	if hash1 == hash3 {
 		t.Error("expected different checksum when schema content changes")
 	}
@@ -588,7 +594,8 @@ func TestReconcileSkipsWhenSchemasUnchanged(t *testing.T) {
 	subgraph := newSubgraphSchema("svc", "default", "http://svc:8080/query", "type Query { ok: Boolean! }")
 
 	r := &SubgraphSchemaReconciler{SupergraphConfigMap: "graph-supergraph"}
-	schemasChecksum := r.computeSchemasChecksum([]codefiniov1alpha1.SubgraphSchema{*subgraph})
+	resolvedSDLs := map[string]string{"svc": subgraph.Spec.Schema}
+	schemasChecksum := r.computeSchemasChecksumFromResolved([]codefiniov1alpha1.SubgraphSchema{*subgraph}, resolvedSDLs)
 
 	// Pre-create ConfigMap with matching schemas-checksum.
 	cm := &corev1.ConfigMap{

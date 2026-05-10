@@ -66,8 +66,21 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	// 2. Schema diff detection — skip composition if schemas haven't changed.
-	schemasChecksum := r.computeSchemasChecksum(schemas.Items)
+	// 2. Resolve all schemas (inline or from ConfigMap).
+	resolvedSDLs := make(map[string]string, len(schemas.Items))
+	for _, s := range schemas.Items {
+		sdl, err := r.resolveSchema(ctx, s)
+		if err != nil {
+			logger.Error(err, "failed to resolve schema", "subgraph", s.Name)
+			r.emitEvent(schemas.Items, corev1.EventTypeWarning, "CompositionFailed", err.Error())
+			r.updateAllStatuses(ctx, schemas.Items, codefiniov1alpha1.CompositionStatusFailed, "", err.Error())
+			return ctrl.Result{RequeueAfter: 30 * time.Second}, nil
+		}
+		resolvedSDLs[s.Name] = sdl
+	}
+
+	// 3. Schema diff detection — skip composition if schemas haven't changed.
+	schemasChecksum := r.computeSchemasChecksumFromResolved(schemas.Items, resolvedSDLs)
 	operatormetrics.SubgraphsTotal.Set(float64(len(schemas.Items)))
 	if r.schemasUnchanged(ctx, req.Namespace, schemasChecksum) {
 		logger.Info("schemas unchanged, skipping composition", "schemasChecksum", schemasChecksum)
@@ -75,9 +88,9 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	// 3. Compose the supergraph.
+	// 4. Compose the supergraph.
 	composeStart := time.Now()
-	supergraphSDL, err := r.compose(ctx, schemas.Items)
+	supergraphSDL, err := r.composeFromResolved(ctx, schemas.Items, resolvedSDLs)
 	composeDuration := time.Since(composeStart)
 	operatormetrics.CompositionDuration.Observe(composeDuration.Seconds())
 	if err != nil {
@@ -92,34 +105,34 @@ func (r *SubgraphSchemaReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	checksum := fmt.Sprintf("%x", sha256.Sum256([]byte(supergraphSDL)))
 	logger.Info("composition succeeded", "checksum", checksum, "subgraphs", len(schemas.Items), "duration", composeDuration)
 
-	// 4. Dry-run mode — log result but don't apply.
+	// 5. Dry-run mode — log result but don't apply.
 	if r.DryRun {
 		logger.Info("dry-run mode: skipping ConfigMap/Deployment update", "checksum", checksum)
 		r.emitEvent(schemas.Items, corev1.EventTypeNormal, "CompositionDryRun", fmt.Sprintf("Composed supergraph (checksum: %s), dry-run — not applied", checksum[:12]))
 		return ctrl.Result{}, nil
 	}
 
-	// 5. Create or update the supergraph ConfigMap.
+	// 6. Create or update the supergraph ConfigMap.
 	if err := r.upsertConfigMap(ctx, req.Namespace, supergraphSDL, checksum, schemasChecksum); err != nil {
 		logger.Error(err, "failed to update supergraph ConfigMap")
 		return ctrl.Result{}, err
 	}
 
-	// 6. Patch the router Deployment to trigger a rolling restart.
+	// 7. Patch the router Deployment to trigger a rolling restart.
 	if err := r.patchDeployment(ctx, req.Namespace, checksum); err != nil {
 		logger.Error(err, "failed to patch router Deployment")
 		return ctrl.Result{}, err
 	}
 
-	// 7. Update status on all SubgraphSchema CRs and emit success event.
+	// 8. Update status on all SubgraphSchema CRs and emit success event.
 	r.emitEvent(schemas.Items, corev1.EventTypeNormal, "CompositionSucceeded", fmt.Sprintf("Composed supergraph with %d subgraphs (checksum: %s)", len(schemas.Items), checksum[:12]))
 	r.updateAllStatuses(ctx, schemas.Items, codefiniov1alpha1.CompositionStatusSuccess, checksum, "Composition succeeded")
 
 	return ctrl.Result{}, nil
 }
 
-// compose writes schemas to a temp directory, generates a rover config, and runs rover supergraph compose.
-func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []codefiniov1alpha1.SubgraphSchema) (string, error) {
+// composeFromResolved writes pre-resolved schemas to a temp dir and runs rover supergraph compose.
+func (r *SubgraphSchemaReconciler) composeFromResolved(ctx context.Context, schemas []codefiniov1alpha1.SubgraphSchema, resolvedSDLs map[string]string) (string, error) {
 	logger := log.FromContext(ctx)
 
 	// Apply composition timeout.
@@ -151,10 +164,7 @@ func (r *SubgraphSchemaReconciler) compose(ctx context.Context, schemas []codefi
 	configLines = append(configLines, "subgraphs:")
 
 	for _, s := range schemas {
-		sdl, err := r.resolveSchema(ctx, s)
-		if err != nil {
-			return "", fmt.Errorf("resolving schema for %s: %w", s.Name, err)
-		}
+		sdl := resolvedSDLs[s.Name]
 		schemaFile := filepath.Join(tmpDir, s.Name+".graphqls")
 		if err := os.WriteFile(schemaFile, []byte(sdl), 0644); err != nil {
 			return "", fmt.Errorf("writing schema for %s: %w", s.Name, err)
@@ -329,7 +339,7 @@ func (r *SubgraphSchemaReconciler) updateAllStatuses(
 	}
 }
 
-// resolveSchema returns the SDL for a SubgraphSchema, loading from ConfigMapRef if set.
+// resolveSchema returns the SDL for a single SubgraphSchema, loading from ConfigMapRef if set.
 func (r *SubgraphSchemaReconciler) resolveSchema(ctx context.Context, s codefiniov1alpha1.SubgraphSchema) (string, error) {
 	if s.Spec.SchemaFrom != nil && s.Spec.SchemaFrom.ConfigMapRef != nil {
 		ref := s.Spec.SchemaFrom.ConfigMapRef
@@ -349,8 +359,8 @@ func (r *SubgraphSchemaReconciler) resolveSchema(ctx context.Context, s codefini
 	return s.Spec.Schema, nil
 }
 
-// computeSchemasChecksum returns a deterministic SHA-256 of all schema specs (sorted by name).
-func (r *SubgraphSchemaReconciler) computeSchemasChecksum(schemas []codefiniov1alpha1.SubgraphSchema) string {
+// computeSchemasChecksumFromResolved returns a deterministic SHA-256 using actual resolved SDL content.
+func (r *SubgraphSchemaReconciler) computeSchemasChecksumFromResolved(schemas []codefiniov1alpha1.SubgraphSchema, resolvedSDLs map[string]string) string {
 	sorted := make([]codefiniov1alpha1.SubgraphSchema, len(schemas))
 	copy(sorted, schemas)
 	sort.Slice(sorted, func(i, j int) bool {
@@ -361,11 +371,7 @@ func (r *SubgraphSchemaReconciler) computeSchemasChecksum(schemas []codefiniov1a
 	for _, s := range sorted {
 		h.Write([]byte(s.Name))
 		h.Write([]byte(s.Spec.RoutingUrl))
-		h.Write([]byte(s.Spec.Schema))
-		if s.Spec.SchemaFrom != nil && s.Spec.SchemaFrom.ConfigMapRef != nil {
-			h.Write([]byte(s.Spec.SchemaFrom.ConfigMapRef.Name))
-			h.Write([]byte(s.Spec.SchemaFrom.ConfigMapRef.Key))
-		}
+		h.Write([]byte(resolvedSDLs[s.Name]))
 	}
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
