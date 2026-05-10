@@ -22,6 +22,22 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         fsGroup: 65532
+      initContainers:
+        - name: init-rover-home
+          image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop:
+                - ALL
+          command: ["sh", "-c", "cp -r /rover-home-baked/. /rover-home/"]
+          volumeMounts:
+            - name: rover-home
+              mountPath: /rover-home
       containers:
         - name: controller
           image: "{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}"
