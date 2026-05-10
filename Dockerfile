@@ -29,14 +29,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     rm -rf dist && \
     apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
-# Pre-install supergraph plugin so pods don't need internet access at runtime
-RUN HOME=/rover-home APOLLO_CONFIG_HOME=/rover-home \
-    rover supergraph compose --version || true && \
-    HOME=/rover-home APOLLO_CONFIG_HOME=/rover-home APOLLO_TELEMETRY_DISABLED=true \
-    rover supergraph compose \
-      --config /dev/null \
-      --elv2-license accept \
-      --federation-version "=${FEDERATION_VERSION}" 2>/dev/null || true
+# Pre-download supergraph plugin binary so pods don't need internet access at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    mkdir -p /rover-home/bin && \
+    if [ "${TARGETARCH}" = "amd64" ]; then PLUG_ARCH="x86_64-unknown-linux-gnu"; else PLUG_ARCH="aarch64-unknown-linux-gnu"; fi && \
+    curl -fsSL "https://rover.apollo.dev/tar/supergraph/$PLUG_ARCH/v${FEDERATION_VERSION}" -o /tmp/supergraph.tar.gz && \
+    tar -xzf /tmp/supergraph.tar.gz -C /tmp && \
+    mv /tmp/dist/supergraph /rover-home/bin/supergraph-v${FEDERATION_VERSION} && \
+    chmod +x /rover-home/bin/supergraph-v${FEDERATION_VERSION} && \
+    rm -f /tmp/supergraph.tar.gz && \
+    apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
 # Runtime stage
 FROM debian:bookworm-slim
